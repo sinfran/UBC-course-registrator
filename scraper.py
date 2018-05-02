@@ -4,81 +4,116 @@ import config
 import sys
 import re
 
-base_url = "https://courses.students.ubc.ca"
-browse_courses_url = "https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=0"
+SSC_LOGIN_PORTAL = "https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcourses.students.ubc.ca%2Fcs%2Fsecure%2Flogin%3FIMGSUBMIT.x%3D50%26IMGSUBMIT.y%3D18%26IMGSUBMIT%3DIMGSUBMIT"
+SSC_BASE_URL = "https://courses.students.ubc.ca"
+SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 
-br = RoboBrowser (parser = 'html.parser')
+br = None
 
-br.open ("https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcourses.students.ubc.ca%2Fcs%2Fsecure%2Flogin%3FIMGSUBMIT.x%3D50%26IMGSUBMIT.y%3D18%26IMGSUBMIT%3DIMGSUBMIT")
+# Initialize RoboBrowser
+def init_r_browser (url):
+    global br
+    br = RoboBrowser (parser = 'html.parser')
+    br.open (url)
 
-form = br.get_form ()
-form ['username'] = config.DATACOUP_USERNAME
-form ['password'] = config.DATACOUP_PASSWORD
-
-config.cls ()
-print ("Logging in...")
-
-# Login
-br.submit_form (form)
-table = br.find_all ('td')
-if len (table) == 0:
+# Terminate program
+def exit ():
     config.cls ()
     sys.exit ("Login failed.")
 
-# Validate login
-start = '<strong>'
-end = '</strong>'
-name = re.search ('%s(.*)%s' % (start, end), str (table [0])).group (1)
+def handle_form ():
+    global br
+    form = br.get_form ()
+    form ['username'] = config.DATACOUP_USERNAME
+    form ['password'] = config.DATACOUP_PASSWORD
+    config.cls ()
+    print ("Logging in...")
+    br.submit_form (form)
+    return br.find_all ('td')
 
-config.cls ()
-print ("Login successful.\nHello " + name + "!\n")
+def login_and_validate ():
+    table_data = handle_form ()
+    if len (table_data) == 0: # Handle unsuccessful login
+        exit ()
+    name = re.search ('%s(.*)%s' % ('<strong>', '</strong>'), str (table_data [0])).group (1)
+    config.cls ()
+    print ("Login successful.\nHello " + name + "!\n")
 
-# Prompt user to select session
-sessions = br.select ('a[href^="/cs/main?sessyr="]')
-active_session = br.find_all ("li", {"class":"active"})[2].find ('a')
+def select_session ():
+    global br
+    sessions = br.select ('a[href^="/cs/main?sessyr="]')
+    active_session = br.find_all ("li", {"class":"active"})[2].find ('a')
+    print ("Sessions:")
 
-print ("Sessions:")
-for index, session in enumerate (sessions):
-    print (''.join (session.findAll (text = True)) + " [" + str (index + 1) + "]")
+    for index, session in enumerate (sessions):
+        print (''.join (session.findAll (text = True)) + " [" + str (index + 1) + "]")
 
-selection = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
-session_href = sessions [selection].get ('href')
+    selection = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
+    session_href = sessions [selection].get ('href')
+    active_session ['href'] = sessions [selection].get ('href')
+    br.open (SSC_BASE_URL + active_session ['href'])
+    br.open (SSC_BROWSE_URL)
 
-# Set selected session to 'active'
-active_session ['href'] = sessions [selection].get ('href')
-br.open (base_url + active_session ['href'])
-br.open (browse_courses_url)
+def select_course ():
+    global br
+    request = None
+    # Prompt user to enter subject code and course number
+    requested_subject_code = input ("Enter Subject Code (e.g. \"CPSC\"): ")
+    requested_course_num = input ("Enter Course Number: ")
+    requested_course = requested_subject_code + " " + requested_course_num
 
-# Prompt user to select course
-req.COURSE_SUBJECT_CODE = req.course_request ()
+    subject_codes = br.find_all ("td")
+    for s in subject_codes:
+        subject_code_data = s.findAll (text = True)
+        if (len (subject_code_data) == 3):
+            if (subject_code_data [1] == requested_subject_code):
+                request = s.find ('a') ['href']
+                break
+    
+    br.open (SSC_BASE_URL + request)
+  
+    courses = br.find_all ("td")
+    for course in courses:
+        if (course.findAll (text = True) [0] == requested_course):
+            request = course.find ('a') ['href']
 
-all_course_codes = br.find_all ("td")
 
-for course_code in all_course_codes:
-    if (len (course_code.findAll (text = True)) == 3):
-        if (course_code.findAll (text = True) [1] == req.COURSE_SUBJECT_CODE):
-            course_subj_req = course_code.find ('a') ['href']
+    br.open (SSC_BASE_URL + request)
+    sections = br.find_all ("td")
+    requested_section = input ("Enter Course Section: ")
+
+    requested_course = requested_subject_code + " " + requested_course_num + " " + requested_section
+
+    for section in sections:
+        if (len (section.findAll (text = True)) > 1):
+            if (section.findAll (text = True) [1].strip () == requested_course):
+                request = section.find ('a') ['href']
+                break
+
+    br.open (SSC_BASE_URL + request)
+    data = br.find_all ("td")
+
+
+
+    for index, d in enumerate (data):
+        if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
+            print (data [index + 1].findAll (text = True))
             break
 
-br.open (base_url + course_subj_req)
-all_courses = br.find_all ("td")
 
-req.COURSE_NUM = req.course_num_req ()
-req.COURSE = req.COURSE_SUBJECT_CODE + " " + req.COURSE_NUM
+    
 
-for course in all_courses:
-    if (course.findAll (text = True) [0] == req.COURSE):
-        course_url = course.find ('a') ['href']
 
-br.open (base_url + course_url)
-sections = br.find_all ("td")
 
-course_section = input ("Enter Course Section: ")
+def main ():
+    init_r_browser (SSC_LOGIN_PORTAL)
+    login_and_validate ()
+    select_session ()
+    select_course ()
+    
 
-for section in sections:
-    if (len (section.findAll (text = True)) == 3):
-        section = section.findAll (text = True) [1].strip ()
-        print (section)
+
+main ()
 
 
 
@@ -87,82 +122,10 @@ for section in sections:
 
 
 
-#print ("SUCCESS!!!!")
-#           print (req.SUBJECT_CODE)
 
 
 
 
 
-#print (course.findAll (text = True))
 
-#link = br.get_link (str (subject_code))
-
-
-
-#print (link)
-
-
-# Ask user
-
-
-
-
-#
-
-#print (active_session ['href'])###
-#print (active_session['href']) #<a href="/cs/main?sessyr=2017&amp;sesscd=W" title="2017 Winter">2017 Winter</a>
-
-
-#br.open (base_url + active_session ['href'])
-
-#sess_num = re.search ('%s(.*)%s' % (start, end), str (table [2])).group (1)
-#print (sess_num)
-
-
-#active_session = sessions.findAll ('div', {"class" : "active" }).get ('href')
-
-#print (active_session)
-#sessions['href'] = sessions['href'].replace(active_session, sessions [selection].get ('href'))
-
-
-#br.open(base_url + session_link)
-
-
-
-
-
-#print (base_url + sessions [session].find ('href'))
-
-#br.follow_link (base_url + sessions [session].find ('href'))
-
-#browser.follow_link(songs[0])
-
-
-
-#sessions = br.find_all ('div', {"class" : "pull-right"})[1].find_all ('div', {"class" : "btn-group"})[1]
-#session = sessions.find_all ('a')[0]
-
-#mydivs = soup.findAll("div", {"class": "stylelistrow"})
-
-#print (session)
-
-
-
-#from urllib.request import urlopen
-#from bs4 import BeautifulSoup
-#import datetime
-
-
-#dept = input ("Enter course dept (e.g. PSYC): ")
-#course_code = input ("Enter course code: ")
-#url = "https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=3&dept=" + dept.upper() + "&course=" + course_code
-
-#print (url)
-
-
-
-
-#https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=3&dept=CPSC&course=310
-#https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=3&dept=PSYC&course=101
 
