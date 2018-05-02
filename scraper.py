@@ -1,5 +1,6 @@
+from twilio.rest import Client
 from robobrowser import RoboBrowser
-import request as req
+from credentials import account_sid, auth_token, my_cell, my_twilio
 import config
 import sys
 import re
@@ -8,13 +9,17 @@ SSC_LOGIN_PORTAL = "https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcou
 SSC_BASE_URL = "https://courses.students.ubc.ca"
 SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 
+client = None
 br = None
 
-# Initialize RoboBrowser
+# Initialize RoboBrowser and Twilio
 def init_r_browser (url):
     global br
+    global client
+    client = Client (account_sid, auth_token)
     br = RoboBrowser (parser = 'html.parser')
     br.open (url)
+
 
 # Terminate program
 def exit ():
@@ -91,18 +96,20 @@ def select_course ():
                 break
 
     br.open (SSC_BASE_URL + request)
-    data = br.find_all ("td")
 
 
-
-    for index, d in enumerate (data):
+def check_seats ():
+    global br
+    course_data = br.find_all ("td")
+    for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
-            print (data [index + 1].findAll (text = True))
+            num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
+            if (num_seats_available > 0):
+                client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
+                exit ()
+            else:
+                print ("No seats available.")
             break
-
-
-    
-
 
 
 def main ():
@@ -110,6 +117,7 @@ def main ():
     login_and_validate ()
     select_session ()
     select_course ()
+    check_seats ()
     
 
 
