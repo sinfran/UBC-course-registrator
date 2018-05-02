@@ -1,0 +1,8 @@
+import os
+import getpass
+
+def cls(): os.system('cls' if os.name=='nt' else 'clear')
+
+cls ()
+DATACOUP_USERNAME = input ("Enter CWL id: ")
+DATACOUP_PASSWORD = getpass.getpass ("Enter CWL password: ")
