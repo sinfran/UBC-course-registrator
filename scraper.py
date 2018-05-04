@@ -9,6 +9,10 @@ SSC_LOGIN_PORTAL = "https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcou
 SSC_BASE_URL = "https://courses.students.ubc.ca"
 SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 
+
+#https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=5&dept=PSYC&course=305A&section=921
+
+
 client = None
 br = None
 
@@ -20,11 +24,11 @@ def init_r_browser (url):
     br = RoboBrowser (parser = 'html.parser')
     br.open (url)
 
-
 # Terminate program
-def exit ():
+def exit (msg):
     config.cls ()
-    sys.exit ("Login failed.")
+    if (msg == None): sys.exit ("Invalid request.")
+    else: sys.exit (msg)
 
 def handle_form ():
     global br
@@ -39,7 +43,7 @@ def handle_form ():
 def login_and_validate ():
     table_data = handle_form ()
     if len (table_data) == 0: # Handle unsuccessful login
-        exit ()
+        exit ("Login failed.")
     name = re.search ('%s(.*)%s' % ('<strong>', '</strong>'), str (table_data [0])).group (1)
     config.cls ()
     print ("Login successful.\nHello " + name + "!\n")
@@ -53,63 +57,93 @@ def select_session ():
     for index, session in enumerate (sessions):
         print (''.join (session.findAll (text = True)) + " [" + str (index + 1) + "]")
 
-    selection = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
-    session_href = sessions [selection].get ('href')
-    active_session ['href'] = sessions [selection].get ('href')
-    br.open (SSC_BASE_URL + active_session ['href'])
-    br.open (SSC_BROWSE_URL)
+    user_request = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
+
+    try:
+        session_href = sessions [user_request].get ('href')
+        active_session ['href'] = session_href
+        br.open (SSC_BASE_URL + active_session ['href'])
+        br.open (SSC_BROWSE_URL)
+    except Exception:
+        exit (None)
+
+def find_subject (req):
+    global br
+    href = None
+    subject_codes = br.find_all ("td")
+    for s in subject_codes:
+        subject_code_data = s.findAll (text = True)
+        if (len (subject_code_data) == 3):
+            if (subject_code_data [1] == req):
+                href = s.find ('a') ['href']
+                break
+    if (href == None):
+        exit ("Requested course does not exist.")
+    return href
+
+def find_course (req):
+    global br
+    href = None
+    courses = br.find_all ("td")
+    for course in courses:
+        if (course.findAll (text = True) [0] == req):
+            href = course.find ('a') ['href']
+    if (href == None):
+        exit ("Requested course does not exist.")
+    return href
+
+def find_section (req):
+    global br
+    href = None
+    sections = br.find_all ("td")
+    for section in sections:
+        if (len (section.findAll (text = True)) > 1):
+            if (section.findAll (text = True) [1].strip () == req):
+                request = section.find ('a') ['href']
+                break
+    if (href == None):
+        exit ("Requested course does not exist.")
+    return href
+
+
+
 
 def select_course ():
     global br
-    request = None
     # Prompt user to enter subject code and course number
     requested_subject_code = input ("Enter Subject Code (e.g. \"CPSC\"): ")
     requested_course_num = input ("Enter Course Number: ")
     requested_course = requested_subject_code + " " + requested_course_num
 
-    subject_codes = br.find_all ("td")
-    for s in subject_codes:
-        subject_code_data = s.findAll (text = True)
-        if (len (subject_code_data) == 3):
-            if (subject_code_data [1] == requested_subject_code):
-                request = s.find ('a') ['href']
-                break
-    
+    request = find_subject (requested_subject_code)
     br.open (SSC_BASE_URL + request)
   
-    courses = br.find_all ("td")
-    for course in courses:
-        if (course.findAll (text = True) [0] == requested_course):
-            request = course.find ('a') ['href']
-
-
+    request = find_course (requested_course)
     br.open (SSC_BASE_URL + request)
-    sections = br.find_all ("td")
-    requested_section = input ("Enter Course Section: ")
 
+    requested_section = input ("Enter Course Section: ")
     requested_course = requested_subject_code + " " + requested_course_num + " " + requested_section
 
-    for section in sections:
-        if (len (section.findAll (text = True)) > 1):
-            if (section.findAll (text = True) [1].strip () == requested_course):
-                request = section.find ('a') ['href']
-                break
-
-    br.open (SSC_BASE_URL + request)
+    request = find_section (requested_course)
 
 
-def check_seats ():
+    while (1):
+        check_seats (request)
+
+
+def check_seats (request):
     global br
+    br.open (SSC_BASE_URL + request)
     course_data = br.find_all ("td")
     for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
             if (num_seats_available > 0):
                 client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
-                exit ()
-            else:
-                print ("No seats available.")
-            break
+                exit ("")
+                # else:
+                #    print ("No seats available.")
+#break
 
 
 def main ():
@@ -117,7 +151,8 @@ def main ():
     login_and_validate ()
     select_session ()
     select_course ()
-    check_seats ()
+    while (1):
+        check_seats ()
     
 
 
