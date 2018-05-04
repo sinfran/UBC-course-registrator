@@ -9,8 +9,8 @@ SSC_LOGIN_PORTAL = "https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcou
 SSC_BASE_URL = "https://courses.students.ubc.ca"
 SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 
-
-#https://courses.students.ubc.ca/cs/main?pname=subjarea&tname=subjareas&req=5&dept=PSYC&course=305A&section=921
+SSC_COURSE_URL = None
+SSC_SESSION_URL = None
 
 
 client = None
@@ -50,6 +50,7 @@ def login_and_validate ():
 
 def select_session ():
     global br
+    global SSC_SESSION_URL
     sessions = br.select ('a[href^="/cs/main?sessyr="]')
     active_session = br.find_all ("li", {"class":"active"})[2].find ('a')
     print ("Sessions:")
@@ -62,7 +63,8 @@ def select_session ():
     try:
         session_href = sessions [user_request].get ('href')
         active_session ['href'] = session_href
-        br.open (SSC_BASE_URL + active_session ['href'])
+        SSC_SESSION_URL = SSC_BASE_URL + active_session ['href']
+        br.open (SSC_SESSION_URL)
         br.open (SSC_BROWSE_URL)
     except Exception:
         exit (None)
@@ -99,7 +101,7 @@ def find_section (req):
     for section in sections:
         if (len (section.findAll (text = True)) > 1):
             if (section.findAll (text = True) [1].strip () == req):
-                request = section.find ('a') ['href']
+                href = section.find ('a') ['href']
                 break
     if (href == None):
         exit ("Requested course does not exist.")
@@ -126,24 +128,40 @@ def select_course ():
 
     request = find_section (requested_course)
 
+    check_seats (request)
 
-    while (1):
-        check_seats (request)
 
 
 def check_seats (request):
     global br
-    br.open (SSC_BASE_URL + request)
+    global SSC_COURSE_URL
+    SSC_COURSE_URL = SSC_BASE_URL + request
+    br.open (SSC_COURSE_URL)
     course_data = br.find_all ("td")
     for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
             if (num_seats_available > 0):
                 client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
-                exit ("")
-                # else:
-                #    print ("No seats available.")
-#break
+                exit (None)
+
+def keep_checking ():
+    global br
+    try:
+        br.open (SSC_BROWSE_URL)
+        br.open (SSC_SESSION_URL)
+        br.open (SSC_COURSE_URL)
+
+        course_data = br.find_all ("td")
+        for index, d in enumerate (course_data):
+            if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
+                num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
+                if (num_seats_available > 0):
+                    client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
+                    exit ("")
+    except Exception:
+        exit (None)
+
 
 
 def main ():
@@ -151,8 +169,8 @@ def main ():
     login_and_validate ()
     select_session ()
     select_course ()
-    while (1):
-        check_seats ()
+  
+    while (1): keep_checking ()
     
 
 
