@@ -2,26 +2,28 @@ from twilio.rest import Client
 from robobrowser import RoboBrowser
 from credentials import account_sid, auth_token, my_cell, my_twilio
 import config
+import ssc
 import sys
 import re
 
-SSC_LOGIN_PORTAL = "https://cas.id.ubc.ca/ubc-cas/login?TARGET=https%3A%2F%2Fcourses.students.ubc.ca%2Fcs%2Fsecure%2Flogin%3FIMGSUBMIT.x%3D50%26IMGSUBMIT.y%3D18%26IMGSUBMIT%3DIMGSUBMIT"
-SSC_BASE_URL = "https://courses.students.ubc.ca"
-SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 
+course_url = None
+session_url = None
 SSC_COURSE_URL = None
 SSC_SESSION_URL = None
 
 client = None
 br = None
+course_request = None
 
 # Initialize RoboBrowser and Twilio
-def init_r_browser (url):
+def init (url):
     global br
     global client
     client = Client (account_sid, auth_token)
     br = RoboBrowser (parser = 'html.parser')
     br.open (url)
+    config.DATACOUP_MOBILE = '+1' + str (config.DATACOUP_MOBILE)
 
 # Terminate program
 def exit (msg):
@@ -29,6 +31,7 @@ def exit (msg):
     if (msg == None): sys.exit ("Invalid request.")
     else: sys.exit (msg)
 
+# Handle login form
 def handle_form ():
     global br
     form = br.get_form ()
@@ -39,16 +42,18 @@ def handle_form ():
     br.submit_form (form)
     return br.find_all ('td')
 
+# Validate user login
 def login_and_validate ():
     table_data = handle_form ()
-    if len (table_data) == 0: exit ("Login failed.")
+    if len (table_data) == 0:
+        exit ("Login failed.")
     name = re.search ('%s(.*)%s' % ('<strong>', '</strong>'), str (table_data [0])).group (1)
     config.cls ()
     print ("Login successful.\nHello " + name + "!\n")
 
 def select_session ():
     global br
-    global SSC_SESSION_URL
+    global session_url
     sessions = br.select ('a[href^="/cs/main?sessyr="]')
     active_session = br.find_all ("li", {"class":"active"})[2].find ('a')
     print ("Sessions:")
@@ -57,17 +62,16 @@ def select_session ():
         print (''.join (session.findAll (text = True)) + " [" + str (index + 1) + "]")
 
     user_req = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
-
     try:
         session_href = sessions [user_req].get ('href')
         active_session ['href'] = session_href
-        SSC_SESSION_URL = SSC_BASE_URL + active_session ['href']
-        br.open (SSC_SESSION_URL)
-        br.open (SSC_BROWSE_URL)
+        session_url = ssc.base_url + active_session ['href']
+        br.open (session_url)
+        br.open (ssc.browse_url)
     except Exception:
         exit (None)
 
-
+# Find requested subject on SSC
 def find_subject (req):
     global br
     href = None
@@ -79,9 +83,10 @@ def find_subject (req):
                 href = s.find ('a') ['href']
                 break
     if (href == None):
-        exit ("Requested course does not exist.")
+        exit ("Requested subject does not exist.")
     return href
 
+# Find requested course on SSC
 def find_course (req):
     global br
     href = None
@@ -93,6 +98,7 @@ def find_course (req):
         exit ("Requested course does not exist.")
     return href
 
+# Find requested course section on SSC
 def find_section (req):
     global br
     href = None
@@ -103,46 +109,23 @@ def find_section (req):
                 href = section.find ('a') ['href']
                 break
     if (href == None):
-        exit ("Requested course does not exist.")
+        exit ("Requested section does not exist.")
     return href
 
 def select_course ():
     global br
-    # Prompt user to enter subject code and course number
-    requested_subject_code = input ("Enter Subject Code (e.g. \"CPSC\"): ")
-    requested_course_num = input ("Enter Course Number: ")
-    requested_course = requested_subject_code + " " + requested_course_num
-
-    request = find_subject (requested_subject_code)
-    br.open (SSC_BASE_URL + request)
-  
-    request = find_course (requested_course)
-    br.open (SSC_BASE_URL + request)
-
-    requested_section = input ("Enter Course Section: ")
-    requested_course = requested_subject_code + " " + requested_course_num + " " + requested_section
-
-    request = find_section (requested_course)
-
+    global course_request
+    subj_req = input ("Enter Subject Code (e.g. \"CPSC\"): ")
+    num_req = input ("Enter Course Number: ")
+    course_request = subj_req + " " + num_req
+    request = find_subject (subj_req)
+    br.open (ssc.base_url + request)
+    request = find_course (course_request)
+    br.open (ssc.base_url + request)
+    section_req = input ("Enter Course Section: ")
+    course_request = subj_req + " " + num_req + " " + section_req
+    request = find_section (course_request)
     check_seats (request)
-
-def check_seats (request):
-    global br
-    global SSC_COURSE_URL
-    SSC_COURSE_URL = SSC_BASE_URL + request
-    br.open (SSC_COURSE_URL)
-    course_data = br.find_all ("td")
-    for index, d in enumerate (course_data):
-        if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
-            num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
-            if (num_seats_available > 0):
-                register ()
-                twilio_notify (str (num_seats_available))
-                exit ("")
-
-def twilio_notify (seats):
-    msg = seats + " seat(s) available for the requested course."
-    client.messages.create (to = my_cell, from_ = my_twilio, body = msg)
 
 def register ():
     global br
@@ -152,38 +135,56 @@ def register ():
         if (len (d_text) > 0):
             if (d_text [0] == 'Register Section'):
                 href = d ['href']
-                br.open (SSC_BASE_URL + href)
+                br.open (ssc.base_url + href)
 
+def check_seats (request):
+    global br
+    global course_url
+    course_url = ssc.base_url + request
+    br.open (course_url)
+    course_data = br.find_all ("td")
+    for index, d in enumerate (course_data):
+        if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
+            num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
+            if (num_seats_available > 0):
+                register ()
+                twilio_notify (str (num_seats_available))
+                exit ("")
+            else:
+                twilio_notify (0)
 
-
+def twilio_notify (seats):
+    if (seats == 0):
+        msg = "There are currently no seats available for " + course_request + ". A mobile notification will be sent as soon as space becomes available!"
+    else:
+        msg = "There are currently " + seats + " seat(s) available for " + course_request + ". Attempted auto-registration. Check SSC to see if it was successful."
+    client.messages.create (to = config.DATACOUP_MOBILE, from_ = my_twilio, body = msg)
 
 def keep_checking ():
     global br
     try:
-        br.open (SSC_BROWSE_URL)
-        br.open (SSC_SESSION_URL)
-        br.open (SSC_COURSE_URL)
+        br.open (ssc.browse_url)
+        br.open (session_url)
+        br.open (course_url)
         course_data = br.find_all ("td")
         for index, d in enumerate (course_data):
             if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
                 num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
                 if (num_seats_available > 0):
+                    register ()
                     twilio_notify (str (num_seats_available))
                     exit ("")
     except Exception:
         exit (None)
 
 
-
 def main ():
-    init_r_browser (SSC_LOGIN_PORTAL)
+    init (ssc.login_portal)
     login_and_validate ()
     select_session ()
     select_course ()
-  
     while (True): keep_checking ()
     
-
 
 main ()
 
