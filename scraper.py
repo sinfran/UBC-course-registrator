@@ -12,7 +12,6 @@ SSC_BROWSE_URL = SSC_BASE_URL + "/cs/main?pname=subjarea&tname=subjareas&req=0"
 SSC_COURSE_URL = None
 SSC_SESSION_URL = None
 
-
 client = None
 br = None
 
@@ -42,8 +41,7 @@ def handle_form ():
 
 def login_and_validate ():
     table_data = handle_form ()
-    if len (table_data) == 0: # Handle unsuccessful login
-        exit ("Login failed.")
+    if len (table_data) == 0: exit ("Login failed.")
     name = re.search ('%s(.*)%s' % ('<strong>', '</strong>'), str (table_data [0])).group (1)
     config.cls ()
     print ("Login successful.\nHello " + name + "!\n")
@@ -58,16 +56,17 @@ def select_session ():
     for index, session in enumerate (sessions):
         print (''.join (session.findAll (text = True)) + " [" + str (index + 1) + "]")
 
-    user_request = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
+    user_req = int (input ("\nSelect a session (e.g. \"1\"): ")) - 1
 
     try:
-        session_href = sessions [user_request].get ('href')
+        session_href = sessions [user_req].get ('href')
         active_session ['href'] = session_href
         SSC_SESSION_URL = SSC_BASE_URL + active_session ['href']
         br.open (SSC_SESSION_URL)
         br.open (SSC_BROWSE_URL)
     except Exception:
         exit (None)
+
 
 def find_subject (req):
     global br
@@ -107,9 +106,6 @@ def find_section (req):
         exit ("Requested course does not exist.")
     return href
 
-
-
-
 def select_course ():
     global br
     # Prompt user to enter subject code and course number
@@ -130,8 +126,6 @@ def select_course ():
 
     check_seats (request)
 
-
-
 def check_seats (request):
     global br
     global SSC_COURSE_URL
@@ -142,8 +136,26 @@ def check_seats (request):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
             if (num_seats_available > 0):
-                client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
-                exit (None)
+                register ()
+                twilio_notify (str (num_seats_available))
+                exit ("")
+
+def twilio_notify (seats):
+    msg = seats + " seat(s) available for the requested course."
+    client.messages.create (to = my_cell, from_ = my_twilio, body = msg)
+
+def register ():
+    global br
+    data = br.find_all ("a")
+    for d in data:
+        d_text = d.findAll (text = True)
+        if (len (d_text) > 0):
+            if (d_text [0] == 'Register Section'):
+                href = d ['href']
+                br.open (SSC_BASE_URL + href)
+
+
+
 
 def keep_checking ():
     global br
@@ -151,13 +163,12 @@ def keep_checking ():
         br.open (SSC_BROWSE_URL)
         br.open (SSC_SESSION_URL)
         br.open (SSC_COURSE_URL)
-
         course_data = br.find_all ("td")
         for index, d in enumerate (course_data):
             if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
                 num_seats_available = int (course_data [index + 1].findAll (text = True) [0])
                 if (num_seats_available > 0):
-                    client.messages.create (to = my_cell, from_ = my_twilio, body = "There are " + str (num_seats_available) + " seats available.")
+                    twilio_notify (str (num_seats_available))
                     exit ("")
     except Exception:
         exit (None)
@@ -170,7 +181,7 @@ def main ():
     select_session ()
     select_course ()
   
-    while (1): keep_checking ()
+    while (True): keep_checking ()
     
 
 
