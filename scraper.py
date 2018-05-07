@@ -153,6 +153,7 @@ def check_seats (request):
             else:
                 twilio_notify (0)
 
+# Send user a mobile notification when space is available
 def twilio_notify (seats):
     if (seats == 0):
         msg = "There are currently no seats available for " + course_request + ". A mobile notification will be sent as soon as space becomes available!"
