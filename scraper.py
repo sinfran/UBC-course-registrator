@@ -1,6 +1,6 @@
 from twilio.rest import Client
 from robobrowser import RoboBrowser
-from twilio_credentials import account_sid, auth_token, my_cell, my_twilio
+from credentials import account_sid, auth_token, my_cell, my_twilio
 import config
 import ssc
 import sys
