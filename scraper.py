@@ -23,7 +23,8 @@ def init (url):
     client = Client (account_sid, auth_token)
     br = RoboBrowser (parser = 'html.parser')
     br.open (url)
-    config.DATACOUP_MOBILE = '+1' + str (config.DATACOUP_MOBILE)
+    #config.DATACOUP_MOBILE = '+1' + str (config.DATACOUP_MOBILE)
+    config.DATACOUP_MOBILE = "+17788220731"
 
 # Terminate program
 def exit (msg):
@@ -35,8 +36,11 @@ def exit (msg):
 def handle_form ():
     global br
     form = br.get_form ()
-    form ['username'] = config.DATACOUP_USERNAME
-    form ['password'] = config.DATACOUP_PASSWORD
+    #form ['username'] = config.DATACOUP_USERNAME
+    #form ['password'] = config.DATACOUP_PASSWORD
+    form ['username'] = "francsin"
+    form ['password'] = "sD302835!!"
+    
     config.cls ()
     print ("Logging in...")
     br.submit_form (form)
@@ -115,14 +119,19 @@ def find_section (req):
 def select_course ():
     global br
     global course_request
-    subj_req = input ("Enter Subject Code (e.g. \"CPSC\"): ")
-    num_req = input ("Enter Course Number: ")
+    #subj_req = input ("Enter Subject Code (e.g. \"CPSC\"): ")
+    #num_req = input ("Enter Course Number: ")
+
+    subj_req = "CPSC"
+    num_req = "221"
+    section_req = "L0B"
+
     course_request = subj_req + " " + num_req
     request = find_subject (subj_req)
     br.open (ssc.base_url + request)
     request = find_course (course_request)
     br.open (ssc.base_url + request)
-    section_req = input ("Enter Course Section: ")
+    #section_req = input ("Enter Course Section: ")
     course_request = subj_req + " " + num_req + " " + section_req
     request = find_section (course_request)
     check_seats (request)
