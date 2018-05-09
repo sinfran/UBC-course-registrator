@@ -6,7 +6,7 @@ class Config(object):
 
 def cls(): os.system('cls' if os.name=='nt' else 'clear')
 
-cls ()
-DATACOUP_USERNAME = input ("Enter CWL id: ")
-DATACOUP_PASSWORD = getpass.getpass ("Enter CWL password: ")
-DATACOUP_MOBILE = input ("Enter your phone number: ")
+#cls ()
+#DATACOUP_USERNAME = input ("Enter CWL id: ")
+#DATACOUP_PASSWORD = getpass.getpass ("Enter CWL password: ")
+#DATACOUP_MOBILE = input ("Enter your phone number: ")
