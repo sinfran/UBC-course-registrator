@@ -32,10 +32,19 @@ def login ():
             return redirect (url_for ('index'))
     return render_template ('login.html', title='Sign In', form=login)
 
-@app.route ('/index')
+@app.route ('/index', methods=[ 'GET', 'POST' ])
 def index ():
     global br
     form = CourseSelectionForm ()
+    if form.validate_on_submit ():
+        year = re.search ('[0-9]{4}', form.sessions.data).group (0)
+        term = re.search ('[S|W]', form.sessions.data).group (0)
+        session_href = '/cs/main?sessyr=' + year + '&sesscd=' + term
+        
+        active_session = br.find_all ("li", {"class":"active"})[2].find ('a')
+        active_session ['href'] = session_href
+        br.open (ssc.base_url + active_session ['href'])
+        br.open (ssc.browse_url)
     return render_template ('index.html', title='UBC Course Registrator', form=form)
 
 
