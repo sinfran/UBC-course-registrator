@@ -62,22 +62,25 @@ def index ():
                                     course_request = form.subject_code.data + " " + form.course_num.data + " " + form.section.data
                                     if (section.findAll (text = True) [1].strip () == course_request):
                                         br.open (ssc.base_url + section.find ('a') ['href'])
-                                        print ("reached here.")
-                                        course_data = br.find_all ("td")
-                                        for index, d in enumerate (course_data):
-                                            if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
-                                                print (int (course_data [index + 1].findAll (text = True) [0]))
+                                        return redirect (url_for ('results'))
+    
         
         return redirect (url_for ('index'))
     return render_template ('index.html', title='UBC Course Registrator', form=form)
 
-@app.route ('/results')
+@app.route ('/results', methods=[ 'GET', 'POST' ])
 def results ():
     global br
+    course_data = br.find_all ("td")
+    for index, d in enumerate (course_data):
+        if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
+            num_seats = course_data [index + 1].findAll (text = True) [0]
+            print (num_seats)
     
     
-    return None
-
+    
+    
+    return render_template ('results.html', title='UBC Course Registrator', seats=str (num_seats))
 
 
 
