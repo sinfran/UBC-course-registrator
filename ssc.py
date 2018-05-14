@@ -11,7 +11,6 @@ def get_sessions ():
     choices = []
     for session in sessions:
         choices.append (''.join (session.findAll (text = True)))
-    print (choices)
     return choices
 
 

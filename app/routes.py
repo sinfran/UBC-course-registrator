@@ -8,6 +8,7 @@ import ssc
 import re
 
 br = None
+course = None
 
 @app.route ('/')
 @app.route('/login', methods=[ 'GET', 'POST' ])
@@ -35,6 +36,7 @@ def login ():
 @app.route ('/index', methods=[ 'GET', 'POST' ])
 def index ():
     global br
+    global course
     form = CourseSelectionForm ()
     if form.validate_on_submit ():
         year = re.search ('[0-9]{4}', form.sessions.data).group (0)
@@ -62,6 +64,7 @@ def index ():
                                     course_request = form.subject_code.data + " " + form.course_num.data + " " + form.section.data
                                     if (section.findAll (text = True) [1].strip () == course_request):
                                         br.open (ssc.base_url + section.find ('a') ['href'])
+                                        course = course_request
                                         return redirect (url_for ('results'))
     
         
@@ -71,16 +74,13 @@ def index ():
 @app.route ('/results', methods=[ 'GET', 'POST' ])
 def results ():
     global br
+    global course
     course_data = br.find_all ("td")
     for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats = course_data [index + 1].findAll (text = True) [0]
             print (num_seats)
-    
-    
-    
-    
-    return render_template ('results.html', title='UBC Course Registrator', seats=str (num_seats))
+    return render_template ('results.html', title='UBC Course Registrator', course = course, seats=str (num_seats))
 
 
 
