@@ -9,6 +9,8 @@ import re
 
 br = None
 course = None
+request = None
+session = None
 
 @app.route ('/')
 @app.route('/login', methods=[ 'GET', 'POST' ])
@@ -37,6 +39,8 @@ def login ():
 def index ():
     global br
     global course
+    global request
+    global session
     form = CourseSelectionForm ()
     if form.validate_on_submit ():
         year = re.search ('[0-9]{4}', form.sessions.data).group (0)
@@ -46,7 +50,7 @@ def index ():
         active_session ['href'] = session_href
         br.open (ssc.base_url + active_session ['href'])
         br.open (ssc.browse_url)
-        
+        session = ssc.base_url + active_session ['href']
         subject_codes = br.find_all ("td")
         for s in subject_codes:
             subject_code_data = s.findAll (text = True)
@@ -63,7 +67,9 @@ def index ():
                                 if (len (section.findAll (text = True)) > 1):
                                     course_request = form.subject_code.data + " " + form.course_num.data + " " + form.section.data
                                     if (section.findAll (text = True) [1].strip () == course_request):
-                                        br.open (ssc.base_url + section.find ('a') ['href'])
+                                        request = ssc.base_url + section.find ('a') ['href']
+                                        br.open (request)
+                                        
                                         course = course_request
                                         return redirect (url_for ('results'))
     
@@ -79,8 +85,13 @@ def results ():
     for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats = course_data [index + 1].findAll (text = True) [0]
-            print (num_seats)
     return render_template ('results.html', title='UBC Course Registrator', course = course, seats=str (num_seats))
+
+@app.route ('/twilio', methods=[ 'GET', 'POST' ])
+def twilio ():
+    return render_template ('twilio.html', title='UBC Course Registrator')
+    
+
 
 
 
