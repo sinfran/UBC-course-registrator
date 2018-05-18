@@ -1,3 +1,12 @@
-<html>
-    <h1>Hi</h1>
-</html>
+{% block content %}
+<h1>Mobile Set-Up</h1>
+<form action="/twilio" method="post">
+    <p>
+    {{ form.mobile_number.label }}<br>
+    {{ form.mobile_number(size=32) }}
+    </p>
+    <p>
+    {{ form.submit() }}
+    </p>
+</form>
+{% endblock %}

@@ -1,7 +1,7 @@
 from flask import render_template, flash, redirect, url_for
 from flask_login import current_user, login_user
 from robobrowser import RoboBrowser
-from app.forms import LoginForm, CourseSelectionForm
+from app.forms import LoginForm, CourseSelectionForm, MobileNotificationForm
 from app.models import User
 from app import app
 import ssc
@@ -89,8 +89,11 @@ def results ():
 
 @app.route ('/twilio', methods=[ 'GET', 'POST' ])
 def twilio ():
-    return render_template ('twilio.html', title='UBC Course Registrator')
+    form = MobileNotificationForm ()
+    # mobile = '+1' + form.mobile_number.data
     
+    return render_template ('twilio.html', title='UBC Course Registrator', form=form)
+
 
 
 

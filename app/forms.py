@@ -16,4 +16,7 @@ class CourseSelectionForm (FlaskForm):
     section = StringField ('Section', validators = [DataRequired ()])
     submit = SubmitField ('Submit')
 
+class MobileNotificationForm (FlaskForm):
+    mobile_number = StringField ('Mobile Number:', validators = [DataRequired ()])
+    submit = SubmitField ('Submit')
 
