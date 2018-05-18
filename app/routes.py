@@ -90,8 +90,10 @@ def results ():
 @app.route ('/twilio', methods=[ 'GET', 'POST' ])
 def twilio ():
     form = MobileNotificationForm ()
-    # mobile = '+1' + form.mobile_number.data
-    
+    if form.validate_on_submit ():
+        mobile = '+1' + form.mobile_number.data
+        print (mobile)
+        return redirect (url_for ('index'))
     return render_template ('twilio.html', title='UBC Course Registrator', form=form)
 
 
