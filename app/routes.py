@@ -4,6 +4,7 @@ from robobrowser import RoboBrowser
 from app.forms import LoginForm, CourseSelectionForm, MobileNotificationForm
 from app.models import User
 from app import app
+import twilio
 import ssc
 import re
 
@@ -11,6 +12,7 @@ br = None
 course = None
 request = None
 session = None
+msg = None
 
 @app.route ('/')
 @app.route('/login', methods=[ 'GET', 'POST' ])
@@ -81,11 +83,22 @@ def index ():
 def results ():
     global br
     global course
+    global msg
     course_data = br.find_all ("td")
     for index, d in enumerate (course_data):
         if (d.findAll (text = True) [0] == 'Total Seats Remaining:'):
             num_seats = course_data [index + 1].findAll (text = True) [0]
+            msg = create_twilio_msg (num_seats)
+            print (msg)
     return render_template ('results.html', title='UBC Course Registrator', course = course, seats=str (num_seats))
+
+def create_twilio_msg (seats):
+    global course
+    if (seats == 0):
+        return "There are currently no seats available for " + course + ". A mobile notification will be sent as soon as space becomes available!"
+    else:
+        return "There are currently " + seats + " seat(s) available for " + course + ". Attempted auto-registration. Check SSC to see if it was successful."
+
 
 @app.route ('/twilio', methods=[ 'GET', 'POST' ])
 def twilio ():
@@ -95,7 +108,6 @@ def twilio ():
         print (mobile)
         return redirect (url_for ('index'))
     return render_template ('twilio.html', title='UBC Course Registrator', form=form)
-
 
 
 
